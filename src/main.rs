@@ -2,6 +2,8 @@ use std::{
     fs,
     io::{prelude::*, BufReader},
     net::{TcpListener, TcpStream},
+    thread,
+    time::Duration,
 };
 
 fn main() {
@@ -26,27 +28,26 @@ fn handle_connection(mut stream: TcpStream) {
     // HTTP Request is text based requet. so stream itself is a string.
     println!("Request: {:#?}", request_line);
 
+    let html_page_dir = "src/public";
+
     // handle request respectively to request_line
-    if request_line == "GET / HTTP/1.1" {
-        // create response and put it into the stream
-        // at this point, stream is a magic door that connects server and client
-        let status_line = "HTTP/1.1 200 OK";
-        let contents = fs::read_to_string("src/public/index.html").unwrap();
-        let length = contents.len();
 
-        let response = format!("{status_line}\r\nContent-Length: {length}\r\n\r\n{contents}");
+    let (status_line, filename) = match &request_line[..] {
+        "GET / HTTP/1.1" => ("HTTP/1.1 200 OK", format!("{html_page_dir}/index.html")),
+        "GET /sleep HTTP/1.1" => {
+            thread::sleep(Duration::from_secs(5));
+            ("HTTP/1.1 200 OK", format!("{html_page_dir}/index.html"))
+        }
+        _ => (
+            "HTTP/1.1 404 NOT FOUND",
+            format!("{html_page_dir}/404.html"),
+        ),
+    };
 
-        println!("Response: {:#?}", response);
+    let contents = fs::read_to_string(filename).unwrap();
+    let length = contents.len();
 
-        // send bytes of response to the stream
-        return stream.write_all(response.as_bytes()).unwrap();
-    } else {
-        let status_line = "HTTP/1.1 404 NOT FOUND";
-        let contents = fs::read_to_string("src/public/404.html").unwrap();
-        let length = contents.len();
+    let response = format!("{status_line}\r\nContent-Length: {length}\r\n\r\n{contents}");
 
-        let response = format!("{status_line}\r\nContent-Length: {length}\r\n\r\n{contents}");
-
-        return stream.write_all(response.as_bytes()).unwrap();
-    }
+    stream.write_all(response.as_bytes()).unwrap();
 }
