@@ -1,3 +1,4 @@
+mod tests;
 use std::{
     fs,
     io::{prelude::*, BufReader},
@@ -5,19 +6,26 @@ use std::{
     thread,
     time::Duration,
 };
-
+use rust_tutorial_webserver::ThreadPool;
 fn main() {
     // create a socket listener binded to port 7878
     let listener = TcpListener::bind("127.0.0.1:7878").unwrap();
+    let pool = ThreadPool::new(100);
 
     // if client connects to the socket, then this part runs
     for stream in listener.incoming() {
         // stream is open connection between server and client
         let stream = stream.unwrap();
 
-        // we call handle_connection function to handle requests from client
-        handle_connection(stream);
+        // create a new thread for each request
+        // this is not a good way due to exposure to DDOS attack
+        pool.execute(|| {
+            // we call handle_connection function to handle requests from client
+            handle_connection(stream);
+        });
     }
+
+    println!("shutting down server");
 }
 
 fn handle_connection(mut stream: TcpStream) {
